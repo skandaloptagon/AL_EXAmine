@@ -3,6 +3,7 @@ Alexa Crawler
 
 #set up
 First run virtualenv to virtualize your python environment
+
         virtualenv ENV
         source bin/activate
 	pip install -r requirements.txt
