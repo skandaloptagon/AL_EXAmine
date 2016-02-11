@@ -1,8 +1,8 @@
 # AL_EXAmine
 Alexa Crawler
 
-#set up
-First run virtualenv to virtualize your python environment
+#SET UP
+First run virtualenv to virtualize your python environment. (DO THIS BEFORE MAKING THIS PROJECT THE ACTIVE DIRECTORY)
 
 	virtualenv ENV
 	source bin/activate
