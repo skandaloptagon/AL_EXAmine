@@ -4,9 +4,10 @@
 #
 # See documentation in:
 # http://doc.scrapy.org/en/latest/topics/items.html
+#
+# Author: John Skandalakis
 
 import scrapy
-
 
 class CrawlexaItem(scrapy.Item):
     # define the fields for your item here like:
