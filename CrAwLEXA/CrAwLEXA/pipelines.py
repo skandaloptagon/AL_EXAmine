@@ -7,18 +7,30 @@
 #
 # Author: John Skandalakis
 
-import umsgpack
+import time
+from time import sleep
+import gzip
+from tldextract import extract
+import os
+
+import errno
+
+def make_sure_path_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 class MessagePackPipeline(object):
 
-    # open content.bin
-    f = open('content.bin', 'wb')
-
     def process_item(self, item, spider):
-        # pack an object consisting of url and the content of the url
-        umsgpack.pack({item['url']:item['content']}, self.f)
-        return item
+        tsname = '{}_{}.gz'.format(item['url'].replace('/','{}'),time.time())
+        path = 'content/{}'.format('.'.join(extract(item['url'])))
+        make_sure_path_exists(path)
 
-    def close_spider(self, spider):
-        # close the file for good measure
-        self.f.close()
+        fname = '{}/{}'.format(path,tsname)
+        with gzip.open(fname,'w') as f:
+            f.write(item['content'])
+
+        return item

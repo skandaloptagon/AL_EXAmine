@@ -3,6 +3,8 @@
 
 # Alexa Stuff
 *.csv
+CrAwLEXA/content/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

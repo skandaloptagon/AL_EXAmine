@@ -24,7 +24,7 @@ CONCURRENT_REQUESTS=32
 
 CONCURRENT_ITEMS=200
 REACTOR_THREADPOOL_MAXSIZE = 20
-
+REDIRECT_ENABLED = False
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
