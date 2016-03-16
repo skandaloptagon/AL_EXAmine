@@ -3,6 +3,12 @@ import glob
 import gzip
 import os
 
+    
+# encoding=utf8  
+import sys  
+
+reload(sys)  
+sys.setdefaultencoding('ISO-8859-1')
 
 for domain in glob.glob('content/*'):
 
@@ -19,7 +25,7 @@ for domain in glob.glob('content/*'):
             try:
                 timestamps.add(float('.'.join(filename.split('_')[-1].split('.')[:-1])))
             except Exception as e:
-                print e, filename
+                pass
         
         # We really only care about the oldest and the newest
         mn = None
@@ -29,6 +35,7 @@ for domain in glob.glob('content/*'):
             mn = min(timestamps)
             mx = max(timestamps)
         except Exception as e:
+            print e, mn, mx
             continue        
 
         # Make sure you are taking fresh diffs
@@ -42,13 +49,15 @@ for domain in glob.glob('content/*'):
             except Exception as e:
                 print e, path+'_'+str(mn)+'.gz'
                 continue
-
+            
             # write the diff to a file
-            with gzip.open(path+'_'+str(mn)+'diff'+'.gz','w') as f:
+            with gzip.open(path+'_'+str(mn)+'_diff'+'.gz','w') as f:
                 try:
-                    f.write(htmldiff(old_html,new_html).encode('ascii', 'replace'))
+                    f.write(htmldiff(old_html,new_html))
                 except AssertionError as e:
-                    print e, 
+                    print e, path
+                except UnicodeEncodeError as e:
+                    print e, path
 
             # delete all old files
             for i in timestamps-set([mx]):
