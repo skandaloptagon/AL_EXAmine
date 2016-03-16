@@ -39,5 +39,5 @@ class AlexaTop1mSpider(scrapy.Spider):
         #Populate the item for use in pipelines
         item = CrawlexaItem()
         item['url'] = response.url
-        item['content'] = response.body
+        item['content'] = response.body_as_unicode()
         yield item

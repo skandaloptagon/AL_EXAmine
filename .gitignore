@@ -4,7 +4,11 @@
 # Alexa Stuff
 *.csv
 CrAwLEXA/content/
+CrAwLEXA/labels/
+CrAwLEXA/logs/
+CrAwLEXA/trace/
 
+build/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
