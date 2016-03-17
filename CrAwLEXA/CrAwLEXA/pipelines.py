@@ -31,6 +31,6 @@ class MessagePackPipeline(object):
 
         fname = '{}/{}'.format(path,tsname)
         with gzip.open(fname,'w') as f:
-            f.write(item['content'].encode('ISO-8859-1'))
+            f.write(item['content'].encode('utf-8'))
 
         return item

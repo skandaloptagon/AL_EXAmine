@@ -15,6 +15,8 @@ SPIDER_MODULES = ['CrAwLEXA.spiders']
 NEWSPIDER_MODULE = 'CrAwLEXA.spiders'
 
 LOG_LEVEL = 'INFO'
+LOG_FILE = 'logs/scrapy.log'
+
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'CrAwLEXA (+http://www.yourdomain.com)'
