@@ -2,13 +2,16 @@ from lxml.html.diff import htmldiff
 import glob
 import gzip
 import os
-
+import logging
     
 # encoding=utf8  
 import sys  
 
 reload(sys)  
 sys.setdefaultencoding('ISO-8859-1')
+
+
+logging.basicConfig(level=logging.DEBUG)
 
 for domain in glob.glob('content/*'):
 
@@ -26,42 +29,31 @@ for domain in glob.glob('content/*'):
                 timestamps.add(float('.'.join(filename.split('_')[-1].split('.')[:-1])))
             except Exception as e:
                 pass
-        
-        # We really only care about the oldest and the newest
-        mn = None
-        mx = None        
-
         try:
-            mn = min(timestamps)
-            mx = max(timestamps)
-        except Exception as e:
-            print e, mn, mx
-            continue        
-
-        # Make sure you are taking fresh diffs
-        if mn != mx:
-            
-            # get the oldest and the newest recorded page. 
-            # Theoretically there should only ever be two pages to compare
-            try:
-                old_html = gzip.open(path+'_'+str(mn)+'.gz').read()
-                new_html = gzip.open(path+'_'+str(mx)+'.gz').read()
-            except Exception as e:
-                print e, path+'_'+str(mn)+'.gz'
-                continue
-            
-            # write the diff to a file
-            with gzip.open(path+'_'+str(mn)+'_diff'+'.gz','w') as f:
-                try:
-                    f.write(htmldiff(old_html,new_html))
-                except AssertionError as e:
-                    print e, path
-                except UnicodeEncodeError as e:
-                    print e, path
-
-            # delete all old files
-            for i in timestamps-set([mx]):
-                try:
-                    os.remove(path+'_'+str(i)+'.gz')
-                except Exception as e:
-                    print e, path+'_'+str(i)+'.gz'
+            timestamps = list(timestamps)
+            timestamps.sort()
+            temp1 = path + '_' + str(timestamps[0]) + '.gz'
+            for i in timestamps[1:]:
+                temp2 = path + '_' + str(i) + '.gz'
+                filename = "diffs/"+path+'_'+str(i)+'_diff.gz'
+                dir = os.path.dirname(filename)
+                if not os.path.exists(dir):
+                    os.makedirs(dir)
+                # Skip the ones that have already been diffed
+                if not os.path.isfile(filename):
+                    with open(filename,'w') as f:
+                        try:
+                            try:
+                                f.write(htmldiff(gzip.open(temp1).read(),gzip.open(temp2).read()))
+                                logging.debug("successful write "+filename)
+                            except Exception:
+                                f.write(unicode(htmldiff(gzip.open(temp1).read().decode('utf-8','ignore'),gzip.open(temp2).read().decode('utf-8','ignore'))).encode('utf-8','ignore'))
+                                logging.debug("transcode write "+filename)
+                        except IOError as e:
+                            logging.debug("missing file " + filename)
+                else:
+                    logging.debug("already exists " + filename)
+                temp1 = temp2
+        except TypeError as e:
+            print e
+        

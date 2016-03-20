@@ -30,14 +30,17 @@ class AlexaTop1mSpider(scrapy.Spider):
         with z.open("top-1m.csv") as f:
             alexaCSV = csv.reader(f)
             for row in alexaCSV:
-                #TODO limit the number of URLS to the top n
                 start_urls.append('http://' + row[1] + '/')
 
+    print "Starting Crawl..."
 
     def parse(self, response):
 
         #Populate the item for use in pipelines
         item = CrawlexaItem()
         item['url'] = response.url
-        item['content'] = response.body_as_unicode()
+        item['content']= response.body
+        
+        self.logger.info('successful parse of %s',response.url)
+
         yield item

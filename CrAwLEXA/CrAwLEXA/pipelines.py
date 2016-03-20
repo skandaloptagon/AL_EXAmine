@@ -15,6 +15,8 @@ import os
 
 import errno
 
+import logging
+
 def make_sure_path_exists(path):
     try:
         os.makedirs(path)
@@ -31,6 +33,7 @@ class MessagePackPipeline(object):
 
         fname = '{}/{}'.format(path,tsname)
         with gzip.open(fname,'w') as f:
-            f.write(item['content'].encode('utf-8'))
+            f.write(unicode(item['content'].decode('utf-8','ignore')).encode('utf-8','ignore'))
 
+        logging.info("Successful write of %s", item['url'])
         return item
