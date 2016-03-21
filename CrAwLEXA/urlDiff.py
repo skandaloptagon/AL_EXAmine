@@ -2,6 +2,7 @@ from lxml.html.diff import htmldiff
 import glob
 import gzip
 import os
+import random
 import logging
     
 # encoding=utf8  
@@ -12,8 +13,11 @@ sys.setdefaultencoding('ISO-8859-1')
 
 
 logging.basicConfig(level=logging.DEBUG)
+temp = glob.glob('content/*')
 
-for domain in glob.glob('content/*'):
+random.shuffle(temp)
+
+for domain in temp:
 
     # Ignore the timestamps and get the unique paths
     uniq_urls = set()
