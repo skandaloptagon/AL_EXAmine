@@ -11,28 +11,33 @@ import csv
 from CrAwLEXA.items import CrawlexaItem
 
 class AlexaTop1mSpider(scrapy.Spider):
+
     name = "alexa_top_1m"
 
     # initialize start_urls (scrapy uses this object later
     start_urls = []
-
-    print "Requesting Alexa Top 1 Million..."
-
-    # get the most recent top 1 million from Alexa
-    r = requests.get("http://s3.amazonaws.com/alexa-static/top-1m.csv.zip")
     
-    print "Unzipping Alexa Top 1 Million..."
+    def __init__(self,n=100):
+    
+        print "Requesting Alexa Top 1 Million..."
 
-    # Unzip the top 1 million from memory
-    with zipfile.ZipFile(StringIO.StringIO(r.content)) as z:
+        # get the most recent top 1 million from Alexa
+        r = requests.get("http://s3.amazonaws.com/alexa-static/top-1m.csv.zip")
+    
+        print "Unzipping Alexa Top 1 Million..."
+
+        # Unzip the top 1 million from memory
+        with zipfile.ZipFile(StringIO.StringIO(r.content)) as z:
         
-        # Open and read as CSV
-        with z.open("top-1m.csv") as f:
-            alexaCSV = csv.reader(f)
-            for row in alexaCSV:
-                start_urls.append('http://' + row[1] + '/')
+            # Open and read as CSV
+            with z.open("top-1m.csv") as f:
+                alexaCSV = csv.reader(f)
+                for row in alexaCSV:
+                    if int(row[0]) > int(n):
+                        break
+                    self.start_urls.append('http://' + row[1] + '/')
 
-    print "Starting Crawl..."
+        print "Starting Crawl..."
 
     def parse(self, response):
 

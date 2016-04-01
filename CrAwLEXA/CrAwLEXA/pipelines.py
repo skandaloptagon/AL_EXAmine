@@ -33,7 +33,7 @@ class MessagePackPipeline(object):
 
         fname = '{}/{}'.format(path,tsname)
         with gzip.open(fname,'w') as f:
-            f.write(item['content']))
+            f.write(item['content'])
 
         logging.info("Successful write of %s", item['url'])
         return item
