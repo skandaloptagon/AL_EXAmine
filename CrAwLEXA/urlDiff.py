@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 def do_shit(i=0):
     temp = glob.glob('content/*')
-    size = len(temp)/10
+    size = len(temp)/6
 
     temp = temp[int(i*size):int((i+1)*size)]
     
@@ -73,7 +73,7 @@ def do_shit(i=0):
 
 if __name__ == '__main__':
     jobs = []
-    for i in range(10):
+    for i in range(6):
         p = multiprocessing.Process(target=do_shit, args=(i,))
         jobs.append(p)
         p.start()
