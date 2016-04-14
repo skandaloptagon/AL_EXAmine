@@ -1,3 +1,5 @@
+from __future__ import division
+
 from bs4 import BeautifulSoup
 import re
 import os.path
@@ -6,9 +8,9 @@ import gzip
 import nltk
 from nltk.corpus import stopwords # Import the stop word list
 import cPickle as pickle
+import HTMLParser
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer, CountVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import metrics
@@ -16,24 +18,32 @@ from sklearn.metrics import roc_curve, auc, accuracy_score
 from sklearn.cross_validation import KFold
 from sklearn import svm
 
+
+import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 import argparse
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-V','--vectorizer',default="count",help="The vectorizer type. [count,hashing,tf_idf]")
 parser.add_argument('-N','--ngram_range',default=(0,1),help="The lower and upper boundary of the range of n-values for different n-grams to be extracted. All values of n such that min_n <= n <= max_n will be used.")
-parser.add_argument('-Md','--max_df',default=1.0,help="When building the vocabulary ignore terms that have a document frequency strictly higher than the given threshold (corpus-specific stop words). If float, the parameter represents a proportion of documents, integer absolute counts. This parameter is ignored if vocabulary is not None.")
-parser.add_argument('-md','--min_df',default=1,help="When building the vocabulary ignore terms that have a document frequency strictly lower than the given threshold. This value is also called cut-off in the literature. If float, the parameter represents a proportion of documents, integer absolute counts. This parameter is ignored if vocabulary is not None.")
+parser.add_argument('-Md','--max_df',type=float,default=1.0,help="When building the vocabulary ignore terms that have a document frequency strictly higher than the given threshold (corpus-specific stop words). If float, the parameter represents a proportion of documents, integer absolute counts. This parameter is ignored if vocabulary is not None.")
+parser.add_argument('-md','--min_df',type=float,default=1,help="When building the vocabulary ignore terms that have a document frequency strictly lower than the given threshold. This value is also called cut-off in the literature. If float, the parameter represents a proportion of documents, integer absolute counts. This parameter is ignored if vocabulary is not None.")
 parser.add_argument('-mf','--max_features',type=int,default=None,help="If not None, build a vocabulary that only consider the top max_features ordered by term frequency across the corpus. This parameter is ignored if vocabulary is not None.")
-parser.add_argument('-u','--use_idf',default="count",help="Enable inverse-document-frequency reweighting.")
-parser.add_argument('-s','--smooth_idf',default="count",help="Smooth idf weights by adding one to document frequencies, as if an extra document was seen containing every term in the collection exactly once. Prevents zero divisions.")
-parser.add_argument('-S','--sublinear_tf',default="count",help="Apply sublinear tf scaling, i.e. replace tf with 1 + log(tf).")
+parser.add_argument('-norm',type=str,default=None,help="Norm used to normalize term vectors. None for no normalization.")
+parser.add_argument('-u','--use_idf',type=bool,default=True,help="Enable inverse-document-frequency reweighting.")
+parser.add_argument('-s','--smooth_idf',type=bool,default=True,help="Smooth idf weights by adding one to document frequencies, as if an extra document was seen containing every term in the collection exactly once. Prevents zero divisions.")
+parser.add_argument('-S','--sublinear_tf',type=bool,default=False,help="Apply sublinear tf scaling, i.e. replace tf with 1 + log(tf).")
 
 
 parser.add_argument('-c','--classifier',default="rf",help="The classifier type. [random_forest,,tf_idf]")
 
 
 parser.add_argument('-ne','--n_estimators',default=10, help="The number of trees in the forest.")
+parser.add_argument('-n_neighbors',default=10,type=int, help="Number of neighbors to use by default for k_neighbors queries.")
 parser.add_argument('-mcf','--max_class_features',default=2000,help="The number of features to consider when looking for the best split: If int, then consider max_features features at each split. If float, then max_features is a percentage and int(max_features * n_features) features are considered at each split. If auto, then max_features=sqrt(n_features). If sqrt, then max_features=sqrt(n_features) (same as auto). If log2, then max_features=log2(n_features). If None, then max_features=n_features.Note: the search for a split does not stop until at least one valid partition of the node samples is found, even if it requires to effectively inspect more than max_features features. Note: this parameter is tree-specific.")
 
 
@@ -43,39 +53,61 @@ parser.add_argument('-msl','--min_samples_leaf',default=1,help="The minimum numb
 parser.add_argument('-mwfl','--min_weight_fraction_leaf',default=0,help="The minimum weighted fraction of the input samples required to be at a leaf node. Note: this parameter is tree-specific.")
 parser.add_argument('-mln','--max_leaf_nodes',default=None,help="Grow trees with max_leaf_nodes in best-first fashion. Best nodes are defined as relative reduction in impurity. If None then unlimited number of leaf nodes. If not None then max_depth will be ignored. Note: this parameter is tree-specific.")
 parser.add_argument('-nj','--n_jobs',default=1,help="The number of jobs to run in parallel for both fit and predict. If -1, then the number of jobs is set to the number of cores.")
+parser.add_argument('-f','--fig',default="temp.png",help="the name of the figure")
 
 args = parser.parse_args()
 
+def parse_tags(source):
+    soup = BeautifulSoup(source, 'html.parser')
 
+    links = set()
+    iframes = set()
+    for link in soup.find_all('a'):
+        link = link.get('href')
+        if link == None:
+            continue
+        if link.startswith('http'):
+            try:
+                links.add(str(link).split('/')[2])
+            except UnicodeEncodeError as e:
+                pass
+            except IndexError as e:
+                links.add('local')
 
-# From https://www.kaggle.com/c/word2vec-nlp-tutorial/details/part-1-for-beginners-bag-of-words
-def review_to_words( raw_review ):
-    # Function to convert a raw review to a string of words
-    # The input is a single string (a raw movie review), and 
-    # the output is a single string (a preprocessed movie review)
-    #
-    # 1. Remove HTML
-    try:
-        review_text = BeautifulSoup(raw_review,'html.parser').body.get_text() 
-    except:
-        review_text = BeautifulSoup(raw_review,'html.parser').get_text()
-    #
-    # 2. Remove non-letters        
-    letters_only = re.sub("[^a-zA-Z]", " ", review_text) 
-    #
-    # 3. Convert to lower case, split into individual words
+    for iframe in soup.find_all('iframe')[:-1]:
+        if iframe == None:
+            continue
+        try:
+            iframes.add(iframe.get('src').split('/')[2])
+        except UnicodeEncodeError as e:
+            pass
+        except AttributeError as e:
+            pass 
+        except IndexError as e:
+            iframes.add('local')
+ 
+    letters_only = re.sub("[^a-zA-Z]", " ", soup.get_text()) 
+
     words = letters_only.lower().split()                             
-    #
-    # 4. In Python, searching a set is much faster than searching
-    #   a list, so convert the stop words to a set
     stops = set(stopwords.words("english"))                  
-    # 
-    # 5. Remove stop words
     meaningful_words = [w for w in words if not w in stops]   
-    #
-    # 6. Join the words back into one string separated by space, 
-    # and return the result.
-    return( " ".join( meaningful_words ))
+
+    try:
+        words = ' '.join(meaningful_words)
+    except TypeError as e:
+        words = ''
+
+    try:
+        links = ' '.join(links)
+    except TypeError as e:
+        links = ''
+
+    try:
+        iframes = ' '.join(iframes)
+    except TypeError as e:
+        iframes = ''
+    
+    return links, iframes, words
 
 
 known_labels = dict()
@@ -83,16 +115,19 @@ sector_id = dict()
 train_dict = dict()
 sector_dict = dict()
 
-clean_train_reviews = []
+words = []
+links =[]
+iframes = []
+
 train_sector = []
-j= 2000
+j= 10000
 i = j
 
 if not os.path.isfile("train_temp.p"):
-    print "buildin model data"
+    print "Building model data..."
     sector = 0
     for category in glob.glob('categories/*'):
-        print category
+        print "\tGround Truth:",category
         with open(category, 'r') as f:
             sector_id[sector]=category
             for domain in f:
@@ -109,36 +144,37 @@ if not os.path.isfile("train_temp.p"):
                         known_labels[domain].append(category)
 
                     for path in glob.glob('content/'+domain+'/*'):
-                        with gzip.open(path,'r') as source:
-                            try:
-                                train_dict[domain]=review_to_words(source.read())
+                        try:
+                            with gzip.open(path,'r') as source:
+                                train_dict[domain]=parse_tags(source.read())
                                 sector_dict[domain]=sector
-                                #clean_train_reviews.append(review_to_words(source.read()))
-                                #train_sector.append(sector)
                                 break
-                            except Exception as e:
-                                print e
-                                continue
+                        except HTMLParser.HTMLParseError as e:
+                            pass
         sector+=1
     
-    print "adjusting model data"
+    print "Adjusting model data..."
     for domain in known_labels:
         if len(known_labels[domain]) > 1:
             continue
         try:
-            clean_train_reviews.append(train_dict[domain])
+            links.append(train_dict[domain][0])
+            iframes.append(train_dict[domain][1])
+            words.append(train_dict[domain][2])
             train_sector.append(sector_dict[domain])
             del train_dict[domain]
             del sector_dict[domain]
         except KeyError as ke:
-            print "trying to access deleted data"
+            print "Trying to access deleted data..."
 
-    pickle.dump([clean_train_reviews,train_sector,sector_id],open("train_temp.p",'wb'))
+    pickle.dump([links,iframes,words,train_sector,sector_id],open("train_temp.p",'wb'))
 else:
-    temp = pickle.load( open( "train_temp.p", "rb" ) )
-    clean_train_reviews = temp[0]
-    train_sector = temp[1]
-    sector_id = temp[2]
+    temp = pickle.load(open( "train_temp.p", "rb" ))
+    links = temp[0]
+    iframes = temp[1]
+    words = temp[2]
+    train_sector = temp[3]
+    sector_id = temp[4]
     temp = None
 
 # Initialize the "CountVectorizer" object, which is scikit-learn's
@@ -159,81 +195,145 @@ if (args.vectorizer.lower() == "count"):
 elif(args.vectorizer.lower() == "hashing"):
     vectorizer = HashingVectorizer(decode_error='strict',\
                                n_features=args.max_features, \
-                               non_negative=True, \
-                               #ngram_range=args.ngram_range, \
-                               max_df = args.max_df, \
-                               min_df = args.min_df )
+                               non_negative=True,\
+                                norm = args.norm )
 
 elif(args.vectorizer.lower() == "tf_idf"):
     vectorizer = TfidfVectorizer(analyzer="word", \
                              max_features = args.max_features,\
                              #ngram_range = args.ngram_range,\
                              max_df = args.max_df,\
-                             min_df = args.min_df )
+                             min_df = args.min_df,\
+                             use_idf = args.use_idf,\
+                             smooth_idf = args.smooth_idf,\
+                             sublinear_tf = args.sublinear_tf, \
+                             norm = args.norm )
 
+if_vectorizer = TfidfVectorizer(analyzer="word",max_features = 200)
+l_vectorizer = TfidfVectorizer(analyzer="word", \
+                             max_features = args.max_features,\
+                             #ngram_range = args.ngram_range,\
+                             max_df = args.max_df,\
+                             min_df = args.min_df,\
+                             use_idf = args.use_idf,\
+                             smooth_idf = args.smooth_idf,\
+                             sublinear_tf = args.sublinear_tf, \
+                             norm = args.norm )
 classifier = None
 
 # Initialize a Random Forest classifier with 100 trees
 if args.classifier.lower() =="rf":
     classifier = RandomForestClassifier(n_jobs=-1,n_estimators = 400) 
 elif args.classifier.lower() == "kn":
-    classifier = KNeighborsClassifier(n_neighbors = 28,weights='distance', n_jobs = -1)
+    classifier = KNeighborsClassifier(n_neighbors = args.n_neighbors, weights='distance', n_jobs = -1)
 elif args.classifier.lower() == "svc":
     classifier = svm.SVC()
 
+
+roc_aucL = dict()
+fprL = [[[] for x in range(10)] for x in range(len(sector_id))] 
+tprL = [[[] for x in range(10)] for x in range(len(sector_id))] 
+for i in range(len(sector_id)):
+    roc_aucL[i] = 0
+
+
+
 j=0
-kf = KFold(len(clean_train_reviews), n_folds=10, shuffle=True)
-
-auc_sums = dict()
-
-for i in range(0,48):
-    auc_sums[i] = 0
-
+kf = KFold(len(links), n_folds=10, shuffle=True)
 for train_index, test_index in kf:
 
     print "beginning fold",j
     j+= 1
 
+    V_train = []
+    W_train = []
     X_train = []
     y_train = []
+
+    V_test = []
+    W_test = []
     X_test = []
     y_test = []
 
     for i in train_index:
-        X_train.append(clean_train_reviews[i])
+        V_train.append(links[i])
+        W_train.append(iframes[i])
+        X_train.append(words[i])
         y_train.append(train_sector[i])
     for i in test_index:
-        X_test.append(clean_train_reviews[i])
+        V_test.append(links[i])
+        W_test.append(iframes[i])
+        X_test.append(words[i])
         y_test.append(train_sector[i])
 
-    print "transforming train vector..."
-    train_data_features = vectorizer.fit_transform(X_train)
-    train_data_features = train_data_features.toarray()
+    print "transforming train vector Y..."
+    V_train = l_vectorizer.fit_transform(V_train)
+    V_train = V_train.toarray()
+    
+    print "transforming train vector W..."
+    W_train = if_vectorizer.fit_transform(W_train)
+    W_train = W_train.toarray()
+    
+    print "transforming train vector X..."
+    X_train = vectorizer.fit_transform(X_train)
+    X_train = X_train.toarray()
+    print V_train.shape,W_train.shape,X_train.shape  
+    print "stacking arrays"
+    X_train = np.hstack((V_train, W_train, X_train ))
+    print X_train.shape
 
     print "fitting the classifier..."
     
-    classifier = classifier.fit( train_data_features, y_train )
+    classifier = classifier.fit( X_train, y_train )
  
-    print "transforming test vector..."
-    test_data_features = vectorizer.transform(X_test)
-    test_data_features = test_data_features.toarray() 
+    print "transforming test vector Y..."
+    V_test = l_vectorizer.transform(V_test)
+    V_test = V_test.toarray() 
+
+    print "transforming test vector W..."
+    W_test = if_vectorizer.transform(W_test)
+    W_test = W_test.toarray() 
+
+    print "transforming test vector X..."
+    X_test = vectorizer.transform(X_test)
+    X_test = X_test.toarray() 
+
+    X_test = np.hstack((V_test, W_test, X_test ))
+    print X_test.shape
+
 
     print "predicting..."
-    result = classifier.predict(test_data_features)
+    result = classifier.predict(X_test)
 
     print "results..." 
     temp_auc = 0
+    
     for i in range(0,len(sector_id)):
         fpr, tpr, thresholds = roc_curve(y_test, result, pos_label=i)
         roc_auc = auc(fpr, tpr)
-        try:
-            temp_auc+=roc_auc
-            auc_sums[i] += roc_auc
-        except:
-            pass
+
+        
+        tprL[i][j-1] = tpr.tolist()
+        fprL[i][j-1] = fpr.tolist()
+        roc_aucL[i] += roc_auc
+
 
         print '\troc_auc:{}\tsector:{}'.format(roc_auc,sector_id[i])
-    print "Average auc",temp_auc/len(sector_id)
-    print "Accuracy", accuracy_score(y_test, result)
 
 
+# PART 2 - THE PLOTTENING
+fig = plt.figure(num=None, figsize=(16, 16), dpi=256, facecolor='w', edgecolor='k')
+
+for i in range(0,len(sector_id)):
+    fprA=[sum(e)/len(e) for e in zip(*fprL[i])]
+    tprA=[sum(e)/len(e) for e in zip(*tprL[i])]
+    plt.plot(fprA, tprA, label='{} (area = {})'.format(' '.join(sector_id[i].split('-')[2:]),float(roc_aucL[i]/10)))
+
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver operating characteristic example')
+plt.legend(loc="lower right")
+plt.savefig(args.fig)
