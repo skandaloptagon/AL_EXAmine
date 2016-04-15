@@ -9,8 +9,9 @@
 
 import scrapy
 
+#Structure that contains URL data along with content from site
 class CrawlexaItem(scrapy.Item):
-    # define the fields for your item here like:
+    #Fields that we use in our struct, we have a URL which contains the actual URL of the site we have crawled along with the actual content of that URL.
     url = scrapy.Field()
     content = scrapy.Field()
     pass
