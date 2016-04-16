@@ -21,3 +21,7 @@ APILabels builds files containing the results of api queries on known domains.
 run.sh does everything on a schedule and repeats. Multiple instances of scrapy will be launch effectively refreshing each url every 4 hours.
 
 
+#RUNNING HELPER FILES
+We developed several helper files over the course of this project to automate/make simpiler certain executioins of code.
+
+   1) data_classifier.py - helper code that extracted out the time stamps for all of the URLs that were craweled. This output of data was used to compare the blacklist of domains against the URLS craweled and when. Primarily this was done to determine if 'when' we crawlwed the URLs if they appeared on any of the blacklist data we had. 

@@ -7,6 +7,13 @@ CrAwLEXA/content/
 CrAwLEXA/labels/
 CrAwLEXA/logs/
 CrAwLEXA/trace/
+CrAwLEXA/diffs/
+CrAwLEXA/temp_categories/
+CrAwLEXA/categories/
+
+*.p*
+*.p
+*.tsv
 
 build/
 
