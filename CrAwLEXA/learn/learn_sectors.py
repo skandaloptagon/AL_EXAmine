@@ -28,6 +28,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('-i',default="temp.p",help="input pickle file name")
 parser.add_argument('-V','--vectorizer',default="count",help="The vectorizer type. [count,hashing,tf_idf]")
 parser.add_argument('-N','--ngram_range',default=(0,1),help="The lower and upper boundary of the range of n-values for different n-grams to be extracted. All values of n such that min_n <= n <= max_n will be used.")
 parser.add_argument('-Md','--max_df',type=float,default=1.0,help="When building the vocabulary ignore terms that have a document frequency strictly higher than the given threshold (corpus-specific stop words). If float, the parameter represents a proportion of documents, integer absolute counts. This parameter is ignored if vocabulary is not None.")
@@ -60,37 +61,45 @@ args = parser.parse_args()
 def parse_tags(source):
     soup = BeautifulSoup(source, 'html.parser')
 
-    links = set()
-    iframes = set()
+    linkwords = list()
+    links = list()
+    iframes = list()
     for link in soup.find_all('a'):
         link = link.get('href')
         if link == None:
             continue
         if link.startswith('http'):
             try:
-                links.add(str(link).split('/')[2])
+                links.append(str(link).split('/')[2])
+                linkwords.append(' '.join(re.split('/|-|_',str(link))[3:-1]))
             except UnicodeEncodeError as e:
                 pass
             except IndexError as e:
-                links.add('local')
+                links.append('local')
 
     for iframe in soup.find_all('iframe')[:-1]:
         if iframe == None:
             continue
         try:
-            iframes.add(iframe.get('src').split('/')[2])
+            iframes.append(iframe.get('src').split('/')[2])
         except UnicodeEncodeError as e:
             pass
         except AttributeError as e:
             pass 
         except IndexError as e:
-            iframes.add('local')
+            iframes.append('local')
  
     letters_only = re.sub("[^a-zA-Z]", " ", soup.get_text()) 
 
     words = letters_only.lower().split()                             
     stops = set(stopwords.words("english"))                  
     meaningful_words = [w for w in words if not w in stops]   
+        
+
+    try:
+        linkwords = ' '.join(linkwords)
+    except TypeError as e:
+        linkwords = ''
 
     try:
         words = ' '.join(meaningful_words)
@@ -107,7 +116,7 @@ def parse_tags(source):
     except TypeError as e:
         iframes = ''
     
-    return links, iframes, words
+    return links, iframes, words, linkwords
 
 
 known_labels = dict()
@@ -118,12 +127,13 @@ sector_dict = dict()
 words = []
 links =[]
 iframes = []
+linkwords = []
 
 train_sector = []
 j= 10000
 i = j
 
-if not os.path.isfile("train_temp.p"):
+if not os.path.isfile(args.i):
     print "Building model data..."
     sector = 0
     for category in glob.glob('categories/*'):
@@ -161,20 +171,22 @@ if not os.path.isfile("train_temp.p"):
             links.append(train_dict[domain][0])
             iframes.append(train_dict[domain][1])
             words.append(train_dict[domain][2])
+            linkwords.append(train_dict[domain][3])
             train_sector.append(sector_dict[domain])
             del train_dict[domain]
             del sector_dict[domain]
         except KeyError as ke:
             print "Trying to access deleted data..."
 
-    pickle.dump([links,iframes,words,train_sector,sector_id],open("train_temp.p",'wb'))
+    pickle.dump([links,iframes,words, train_sector, train_sector, sector_id],open(args.i,'wb'))
 else:
-    temp = pickle.load(open( "train_temp.p", "rb" ))
+    temp = pickle.load(open( args.i, "rb" ))
     links = temp[0]
     iframes = temp[1]
     words = temp[2]
-    train_sector = temp[3]
-    sector_id = temp[4]
+    linkwords = temp[3]
+    train_sector = temp[4]
+    sector_id = temp[5]
     temp = None
 
 # Initialize the "CountVectorizer" object, which is scikit-learn's
@@ -188,7 +200,7 @@ if (args.vectorizer.lower() == "count"):
                              preprocessor = None, \
                              stop_words = None,   \
                              max_features = args.max_features, \
-                             #ngram_range = args.ngram_range, \
+                             ngram_range = (1,2), \
                              max_df = args.max_df, \
                              min_df = args.min_df )
 
@@ -210,6 +222,7 @@ elif(args.vectorizer.lower() == "tf_idf"):
                              norm = args.norm )
 
 if_vectorizer = TfidfVectorizer(analyzer="word",max_features = 200)
+lw_vectorizer = CountVectorizer(analyzer="word",max_features = args.max_features)
 l_vectorizer = TfidfVectorizer(analyzer="word", \
                              max_features = args.max_features,\
                              #ngram_range = args.ngram_range,\
@@ -229,14 +242,11 @@ elif args.classifier.lower() == "kn":
 elif args.classifier.lower() == "svc":
     classifier = svm.SVC()
 
-
 roc_aucL = dict()
 fprL = [[[] for x in range(10)] for x in range(len(sector_id))] 
 tprL = [[[] for x in range(10)] for x in range(len(sector_id))] 
 for i in range(len(sector_id)):
     roc_aucL[i] = 0
-
-
 
 j=0
 kf = KFold(len(links), n_folds=10, shuffle=True)
@@ -245,27 +255,34 @@ for train_index, test_index in kf:
     print "beginning fold",j
     j+= 1
 
+    U_train = []
     V_train = []
     W_train = []
     X_train = []
     y_train = []
 
+    U_test = []
     V_test = []
     W_test = []
     X_test = []
     y_test = []
 
     for i in train_index:
+        U_train.append(linkwords[i])
         V_train.append(links[i])
         W_train.append(iframes[i])
         X_train.append(words[i])
         y_train.append(train_sector[i])
     for i in test_index:
+        U_test.append(linkwords[i])
         V_test.append(links[i])
         W_test.append(iframes[i])
         X_test.append(words[i])
         y_test.append(train_sector[i])
 
+    print "transforming train vector Y..."
+    U_train = lw_vectorizer.fit_transform(U_train)
+    U_train = U_train.toarray()
     print "transforming train vector Y..."
     V_train = l_vectorizer.fit_transform(V_train)
     V_train = V_train.toarray()
@@ -279,13 +296,16 @@ for train_index, test_index in kf:
     X_train = X_train.toarray()
     print V_train.shape,W_train.shape,X_train.shape  
     print "stacking arrays"
-    X_train = np.hstack((V_train, W_train, X_train ))
+    X_train = np.hstack((U_train, V_train, W_train, X_train ))
     print X_train.shape
 
     print "fitting the classifier..."
-    
     classifier = classifier.fit( X_train, y_train )
  
+    print "transforming test vector Y..."
+    U_test = lw_vectorizer.transform(U_test)
+    U_test = U_test.toarray() 
+
     print "transforming test vector Y..."
     V_test = l_vectorizer.transform(V_test)
     V_test = V_test.toarray() 
@@ -298,7 +318,7 @@ for train_index, test_index in kf:
     X_test = vectorizer.transform(X_test)
     X_test = X_test.toarray() 
 
-    X_test = np.hstack((V_test, W_test, X_test ))
+    X_test = np.hstack((U_test, V_test, W_test, X_test ))
     print X_test.shape
 
 
@@ -334,6 +354,6 @@ plt.xlim([0.0, 1.0])
 plt.ylim([0.0, 1.05])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('Receiver operating characteristic example')
+plt.title('Receiver operating characteristic')
 plt.legend(loc="lower right")
 plt.savefig(args.fig)
