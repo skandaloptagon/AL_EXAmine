@@ -173,12 +173,10 @@ if not os.path.isfile(args.i):
             words.append(train_dict[domain][2])
             linkwords.append(train_dict[domain][3])
             train_sector.append(sector_dict[domain])
-            del train_dict[domain]
-            del sector_dict[domain]
         except KeyError as ke:
             print "Trying to access deleted data..."
 
-    pickle.dump([links,iframes,words, train_sector, train_sector, sector_id],open(args.i,'wb'))
+    pickle.dump([links, iframes, words, linkwords, train_sector, sector_id],open(args.i,'wb'))
 else:
     temp = pickle.load(open( args.i, "rb" ))
     links = temp[0]

@@ -1,3 +1,7 @@
+# AUTHOR: JOHN SKANDALAKIS
+# DEPRECATED
+# This program runs through the database and fixes the Encoding so they all match.
+
 from lxml.html.diff import htmldiff
 import glob
 import gzip
@@ -17,7 +21,9 @@ for domain in glob.glob('content/*'):
         print "Fixing:",filename
         try:
             with gzip.open(filename,'r') as f:
-                temp = unicode(f.read().decode('utf-8','ignore')).encode('utf-8','ignore')
+            
+
+    temp = unicode(f.read().decode('utf-8','ignore')).encode('utf-8','ignore')
             with gzip.open(filename,'w') as f:
                 f.write(temp)
         except IOError as e:
