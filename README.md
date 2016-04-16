@@ -20,4 +20,21 @@ APILabels builds files containing the results of api queries on known domains.
 
 run.sh does everything on a schedule and repeats. Multiple instances of scrapy will be launch effectively refreshing each url every 4 hours.
 
+#LEARN
 
+This section addresses the programs used for machine learning. Both program works in three parts: 
+
+1. Feature Extraction 
+2. Vector Creation 
+3. Classification
+
+## LEARN SECTORS
+
+`learn_sectors.py` should be used for identifying the different sectors. run `learn_sectors.py -h` for help
+
+## LEARN MALICIOUS PATTERNS
+`learn_mal.py` is used to determin which urls are likely to be malicious. run `learn_mal.py -h` for help
+
+# HELPER FUNCTIONS
+
+This section covers functions that are not explicitely used in the crawler or the classifier but help us get the results we need.
