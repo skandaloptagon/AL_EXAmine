@@ -1,3 +1,8 @@
+# AUTHOR: JOHN SKANDALAKIS
+# The purpose of this code is to parse through every crawled page as 
+# effiently as possible and to collect the URLs and print the URLs, 
+# a timestamp and the crawled urls line by line
+
 from glob import glob
 import gzip
 from multiprocessing import Process, Queue, Lock
