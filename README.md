@@ -39,4 +39,4 @@ This section addresses the programs used for machine learning. Both program work
 
 We developed several helper files over the course of this project to automate/make simpiler certain executioins of code.
 
-   1) data_classifier.py - helper code that extracted out the time stamps for all of the URLs that were craweled. This output of data was used to compare the blacklist of domains against the URLS craweled and when. Primarily this was done to determine if 'when' we crawlwed the URLs if they appeared on any of the blacklist data we had. 
+1. `data_classifier.py`- helper code that extracted out the time stamps for all of the URLs that were craweled. This output of data was used to compare the blacklist of domains against the URLS craweled and when. Primarily this was done to determine if 'when' we crawlwed the URLs if they appeared on any of the blacklist data we had. 

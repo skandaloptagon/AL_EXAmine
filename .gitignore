@@ -11,7 +11,10 @@ CrAwLEXA/diffs/
 CrAwLEXA/temp_categories/
 CrAwLEXA/categories/
 
-*.p*
+*.png
+*.py~
+*.pyc
+*~
 *.p
 *.tsv
 
